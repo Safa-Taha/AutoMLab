@@ -37,7 +37,7 @@ with st.sidebar:
         "https://images.idgesg.net/images/article/2018/01/emerging-tech_ai_machine-learning-100748222-large.jpg"
     )
     st.title("AutoMLab")
-    st.info("This application allows you to build an automated machine learning pipeline using Streamlit and PyCaret.")
+    st.info("AutoMLab is an application allows you to build an automated machine learning pipeline using Streamlit and PyCaret !")
     choice = st.radio("Navigation", ["Upload", "Profiling", "Data Processing", "ML", "Download", "Inference"])
 
 # Function to validate the target variable
