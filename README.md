@@ -1,3 +1,4 @@
+![alt text](<Screenshot 2024-04-24 213751.png>)
 ## Overview
 This application is a data analysis and visualisation tool that allows users to perform exploratory data analysis (EDA), visualise data using various plots, and apply machine learning models using the PyCaret library. The application is designed to be user-friendly and offers a wide range of options for data preprocessing, visualization, and modeling.
 
