@@ -1,281 +1,235 @@
-import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.impute import SimpleImputer
+import pyarrow as pa
+import pyarrow.parquet as pq
+import streamlit as st
+from ydata_profiling import ProfileReport
+from streamlit_pandas_profiling import st_profile_report
+
+from pycaret.classification import (
+    setup as classification_setup,
+    compare_models as classification_compare_models,
+    pull as classification_pull,
+    save_model as classification_save_model,
+    load_model as classification_load_model,
+    predict_model as classification_predict_model,
+    tune_model as classification_tune_model,
+)
+from pycaret.regression import (
+    setup as regression_setup,
+    compare_models as regression_compare_models,
+    pull as regression_pull,
+    save_model as regression_save_model,
+    load_model as regression_load_model,
+    predict_model as regression_predict_model,
+)
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.model_selection import learning_curve, ShuffleSplit
-from pycaret.classification import ClassificationExperiment
-from pycaret.regression import RegressionExperiment
+import os
 
-best_model = None
+# Initialize Streamlit session state for analysis type and uploaded file
+if "analysis_type" not in st.session_state:
+    st.session_state.analysis_type = None
+if "uploaded_file" not in st.session_state:
+    st.session_state.uploaded_file = None
 
-# Define the EDA class
-class EDA:
-    def __init__(self, df):
-        self.df = df
+# Sidebar for navigation and information
+with st.sidebar:
+    st.image(
+        "https://images.idgesg.net/images/article/2018/01/emerging-tech_ai_machine-learning-100748222-large.jpg"
+    )
+    st.title("AutoMLab")
+    st.info("This application allows you to build an automated machine learning pipeline using Streamlit and PyCaret.")
+    choice = st.radio("Navigation", ["Upload", "Profiling", "Data Processing", "ML", "Download", "Inference"])
 
-    def cat_feat(self):
-        df_cat = self.df.select_dtypes(include='object')
-        return df_cat.columns
+# Function to validate the target variable
+def validate_target_variable(df, target):
+    return target in df.columns
 
-    def cat_nulls(self):
-        df_cat = self.df.select_dtypes(include='object')
-        return df_cat.columns[df_cat.isna().sum() > 0]
+# Function to validate features list
+def validate_features(df, features):
+    return [feature for feature in features if feature in df.columns]
 
-    def nums_nulls(self):
-        df_num = self.df.select_dtypes(include=np.number)
-        return df_num.columns[df_num.isna().sum() > 0]
-
-    def fill_with_mean(self, col):
-        imputer = SimpleImputer(strategy='mean')
-        self.df[col] = imputer.fit_transform(self.df[col].values.reshape(-1, 1))
-        return self.df
-
-    def fill_with_median(self, col):
-        imputer = SimpleImputer(strategy='median')
-        self.df[col] = imputer.fit_transform(self.df[col].values.reshape(-1, 1))
-        return self.df
-
-    def fill_with_mode(self, col):
-        most_frequent_value = self.df[col].mode()[0]
-        self.df[col].fillna(most_frequent_value, inplace=True)
-        return self.df
-
-    def fill_with_constant(self, col, value):
-        self.df[col].fillna(value, inplace=True)
-        return self.df
-
-    def one_hot_encoder(self, col):
-        encoder = OneHotEncoder(sparse=False, drop='first')
-        encoded_data = encoder.fit_transform(self.df[col].values.reshape(-1, 1))
-        encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names([col]))
-        self.df = pd.concat([self.df, encoded_df], axis=1).drop(col, axis=1)
-        return self.df
-
-    def label_encoder(self, col):
-        encoder = LabelEncoder()
-        self.df[col] = encoder.fit_transform(self.df[col])
-        return self.df
-
-    def encoding(self):
-        self.df = pd.get_dummies(self.df, drop_first=True)
-        return self.df
-
-# Define the plotting class
-class Plotting:
-    def __init__(self):
-        pass
-
-    def plot_confusion_matrix(self, confusion_matrix, labels):
-        fig, ax = plt.subplots()
-        im = ax.imshow(confusion_matrix, interpolation='nearest', cmap=plt.cm.Blues)
-        ax.figure.colorbar(im, ax=ax)
-        ax.set(xticks=np.arange(confusion_matrix.shape[1]),
-               yticks=np.arange(confusion_matrix.shape[0]),
-               xticklabels=labels, yticklabels=labels,
-               ylabel='True label',
-               xlabel='Predicted label',
-               title='Confusion Matrix')
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-        for i in range(confusion_matrix.shape[0]):
-            for j in range(confusion_matrix.shape[1]):
-                ax.text(j, i, format(confusion_matrix[i, j], 'd'),
-                        ha="center", va="center",
-                        color="white" if confusion_matrix[i, j] > confusion_matrix.max() / 2 else "black")
-        plt.show()
-
-    def plot_roc_curve(self, fpr, tpr, roc_auc):
-        fig, ax = plt.subplots()
-        ax.plot(fpr, tpr, label=f'AUC = {roc_auc:.2f}')
-        ax.plot([0, 1], [0, 1], 'k--')
-        ax.set_xlim([0.0, 1.0])
-        ax.set_ylim([0.0, 1.05])
-        ax.set_xlabel('False Positive Rate')
-        ax.set_ylabel('True Positive Rate')
-        ax.set_title('Receiver Operating Characteristic')
-        ax.legend(loc='lower right')
-        plt.show()
-
-    def plot_learning_curve(self, estimator, title, X, y, scoring):
-        fig, ax = plt.subplots()
-        ax.set_title(title)
-        ax.set_xlabel("Training examples")
-        ax.set_ylabel(scoring)
-        train_sizes, train_scores, test_scores = learning_curve(
-            estimator, X, y, cv=ShuffleSplit(n_splits=10, test_size=0.2, random_state=0),
-            n_jobs=-1, train_sizes=np.linspace(.1, 1.0, 5), scoring=scoring
-        )
-        train_scores_mean = np.mean(train_scores, axis=1)
-        train_scores_std = np.std(train_scores, axis=1)
-        test_scores_mean = np.mean(test_scores, axis=1)
-        test_scores_std = np.std(test_scores, axis=1)
-        ax.fill_between(train_sizes, train_scores_mean - train_scores_std,
-                        train_scores_mean + train_scores_std, alpha=0.1,
-                        color="r")
-        ax.fill_between(train_sizes, test_scores_mean - test_scores_std,
-                        test_scores_mean + test_scores_std, alpha=0.1,
-                        color="g")
-        ax.plot(train_sizes, train_scores_mean, 'o-', color="r",
-                label="Training score")
-        ax.plot(train_sizes, test_scores_mean, 'o-', color="g",
-                label="Cross-validation score")
-        ax.legend(loc="best")
-        plt.show()
-
-    def feature_importance_plot(self, feature_importances, feature_names):
-        feat_imp_series = pd.Series(feature_importances, index=feature_names)
-        sorted_feat_imp = feat_imp_series.sort_values(ascending=False)
-        sorted_feat_imp.plot(kind='bar', color='blue')
-        plt.xlabel('Feature Names')
-        plt.ylabel('Importance')
-        plt.title('Feature Importance')
-        plt.show()
-
-# Function to load data and perform EDA
-def load_and_process_data(file):
-    # Load data using pandas
-    data = pd.read_csv(file)
-
-    # Initialize EDA instance with the data
-    eda = EDA(data)
-
-    # Display categorical features and columns with missing values
-    st.write("Categorical features:", eda.cat_feat())
-    st.write("Categorical columns with missing values:", eda.cat_nulls())
-    st.write("Numerical columns with missing values:", eda.nums_nulls())
-
-    # Options for filling missing values
-    if st.button("Fill missing values with mean"):
-        for col in eda.nums_nulls():
-            eda.fill_with_mean(col)
-        st.write("Missing values filled with mean.")
-    if st.button("Fill missing values with median"):
-        for col in eda.nums_nulls():
-            eda.fill_with_median(col)
-        st.write("Missing values filled with median.")
-    if st.button("Fill missing values with mode"):
-        for col in eda.cat_nulls():
-            eda.fill_with_mode(col)
-        st.write("Missing values filled with mode.")
-    if st.button("Fill missing values with constant"):
-        value = st.text_input("Enter constant value:")
-        if value:
-            for col in eda.cat_nulls():
-                eda.fill_with_constant(col, value)
-            st.write("Missing values filled with constant value.")
-
-    # Encoding options
-    if st.button("One-hot encode categorical columns"):
-        for col in eda.cat_feat():
-            eda.one_hot_encoder(col)
-        st.write("One-hot encoded categorical columns.")
-    if st.button("Label encode categorical columns"):
-        for col in eda.cat_feat():
-            eda.label_encoder(col)
-        st.write("Label encoded categorical columns.")
-    return eda.df
-
-# Function to visualize data using the Plotting class
-def visualize_data(df, column1, column2, plot_type):
-    plotter = Plotting()
-
-    if plot_type == 'histogram':
-        plt.hist(df[column1], bins=20, alpha=0.7, color='blue', label=column1)
-        plt.hist(df[column2], bins=20, alpha=0.7, color='orange', label=column2)
-        plt.xlabel('Value')
-        plt.ylabel('Frequency')
-        plt.title(f'Histogram of {column1} and {column2}')
-        plt.legend()
-        plt.show()
-        
-    elif plot_type == 'boxplot':
-        sns.boxplot(data=df[[column1, column2]])
-        plt.title(f'Box Plot of {column1} and {column2}')
-        plt.show()
-        
-    elif plot_type == 'scatter':
-        sns.scatterplot(x=df[column1], y=df[column2])
-        plt.title(f'Scatter Plot of {column1} vs {column2}')
-        plt.show()
-        
-    elif plot_type == 'heatmap':
-        heatmap_data = df.pivot_table(index=column1, columns=column2, aggfunc='size')
-        sns.heatmap(heatmap_data, cmap='coolwarm', annot=True)
-        plt.title(f'Heatmap of {column1} and {column2}')
-        plt.show()
-
-    elif plot_type == 'pairplot':
-        sns.pairplot(df[[column1, column2]], diag_kind='kde')
-        plt.title(f'Pairplot of {column1} and {column2}')
-        plt.show()
-
-    elif plot_type == 'lineplot':
-        sns.lineplot(x=df[column1], y=df[column2])
-        plt.title(f'Line Plot of {column1} and {column2}')
-        plt.show()
-
-    elif plot_type == 'violin':
-        sns.violinplot(data=df, x=column1, y=column2)
-        plt.title(f'Violin Plot of {column1} and {column2}')
-        plt.show()
-
-    elif plot_type == 'correlation':
-        corr_matrix = df.corr()
-        sns.heatmap(corr_matrix, cmap='coolwarm', annot=True)
-        plt.title('Correlation Matrix')
-        plt.show()
-
+# Function to check if a column needs conversion
+def needs_conversion(column):
+    if column.dtype == 'object':
+        try:
+            pd.to_numeric(column, errors='coerce')
+            return True
+        except:
+            return False
     else:
-        st.write('Invalid plot type selected.')
+        return False
 
-# Main function
-def main():
-    st.title('Data Analysis and Visualization App')
-    
-    # Load data
-    file = st.file_uploader("Upload a dataset", type=["csv"])
-    if file is not None:
-        df = load_and_process_data(file)
-        st.write("Data loaded successfully.")
+# Upload section
+if choice == "Upload":
+    st.title("Upload Your Data for Modeling")
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.session_state.uploaded_file = uploaded_file.name
+        df.to_csv("sourcedata.csv", index=False)
         
-        # Visualization options
-        st.subheader('Data Visualization')
-        plot_type = st.selectbox("Select plot type", ['histogram', 'boxplot', 'scatter', 'heatmap', 'pairplot', 'lineplot', 'violin', 'correlation'])
-        column1 = st.selectbox('Select first column', df.columns)
-        column2 = st.selectbox('Select second column', df.columns)
+        # Convert problematic columns to float
+        columns_to_convert = [column for column in df.columns if needs_conversion(df[column])]
+        for column in columns_to_convert:
+            df[column] = pd.to_numeric(df[column], errors='coerce')
         
-        # Visualize data
-        visualize_data(df, column1, column2, plot_type)
-    
-    # Model selection and evaluation
-    st.subheader('Model Selection and Evaluation')
-    target_column = st.selectbox('Select target column', df.columns)
-    problem_type = st.radio('Problem type', ('Classification', 'Regression'))
-    
-    if st.button('Run PyCaret'):
-        if problem_type == 'Classification':
-            clf_exp = ClassificationExperiment()
-            clf_exp.setup(data=df, target=target_column)
-            best_model = clf_exp.compare_models()
-            st.write(f"Best model: {best_model}")
-        elif problem_type == 'Regression':
-            reg_exp = RegressionExperiment()
-            reg_exp.setup(data=df, target=target_column)
-            best_model = reg_exp.compare_models()
-            st.write(f"Best model: {best_model}")
+        # Convert the DataFrame to an Arrow table
+        table = pa.Table.from_pandas(df)
+        
+        # Write the table to a Parquet filepq.write_table(table, 'data.parquet')
+        
+        st.success("Data uploaded successfully!")
 
-        # Plotting confusion matrix or feature importance
-        plotter = Plotting()
-        if problem_type == 'Classification':
-            if st.button('Plot confusion matrix'):
-                cm = clf_exp.plot_model(best_model, plot='confusion_matrix')
-                plotter.plot_confusion_matrix(cm, labels=clf_exp.get_config('data').columns)
-        elif problem_type == 'Regression':
-            if st.button('Plot feature importance'):
-                feat_importance = reg_exp.plot_model(best_model, plot='feature')
-                plotter.feature_importance_plot(feat_importance, reg_exp.get_config('data').columns)
+# Profiling section
+elif choice == "Profiling":
+    st.title("Automated Exploratory Data Analysis")
+    if os.path.exists("sourcedata.csv"):
+        df = pd.read_csv("sourcedata.csv")
+        df = df.sample(frac=1)
+        profile_report = ProfileReport(df, title="Data Profiling Report")
+        st_profile_report(profile_report)
+    else:
+        st.warning("No data available for profiling. Please upload a file.")
 
-if __name__ == '__main__':
-    main()
+# Data Processing section
+elif choice == "Data Processing":
+    st.title("Data Processing")
+    if os.path.exists("sourcedata.csv"):
+        df = pd.read_csv("sourcedata.csv")
+        
+        # Drop columns if required
+        columns_to_drop = st.multiselect("Select columns to drop", df.columns)
+        if columns_to_drop:
+            df = df.drop(columns_to_drop, axis=1)
+        
+        # Handle missing values in numerical columns
+        missing_value_option = st.selectbox("Choose how to handle missing values", ["Mean", "Median", "Mode", "Drop rows"])
+        if missing_value_option in ["Mean", "Median", "Mode"]:
+            numeric_cols = df.select_dtypes(include='number').columns
+            for col in numeric_cols:
+                if missing_value_option == "Mean":
+                    df[col].fillna(df[col].mean(), inplace=True)
+                elif missing_value_option == "Median":
+                    df[col].fillna(df[col].median(), inplace=True)
+                elif missing_value_option == "Mode":
+                    df[col].fillna(df[col].mode()[0], inplace=True)
+        elif missing_value_option == "Drop rows":
+            df.dropna(inplace=True)
+        
+        # Encode categorical data
+        encode_option = st.selectbox("Choose how to encode categorical data", ["Label Encoding", "One-Hot Encoding"])
+        if encode_option == "Label Encoding":
+            le = LabelEncoder()
+            for col in df.select_dtypes(include='object').columns:
+                df[col] = le.fit_transform(df[col])
+        elif encode_option == "One-Hot Encoding":
+            df = pd.get_dummies(df)
+        
+        # Save processed data
+        df.to_csv("processed_data.csv", index=False)
+        st.success("Data processed and saved successfully!")
+
+# ML section
+elif choice == "ML":
+    st.title("Machine Learning")
+    if os.path.exists("processed_data.csv"):
+        df = pd.read_csv("processed_data.csv")
+        
+        # Print DataFrame columns for checking available columns
+        st.write("DataFrame Columns:", df.columns)
+        
+        # Select target variable
+        target_options = df.columns
+        target = st.selectbox("Select Target Variable", target_options)
+        
+        # Validate selected target variable
+        if not validate_target_variable(df, target):
+            st.error(f"Error: The selected target variable '{target}' is not in the DataFrame columns.")
+        else:
+            # Choose features for modeling
+            features = st.multiselect("Select Features", [col for col in df.columns if col != target])
+            
+            # Validate and filter the ignore_features list
+            ignore_features = [col for col in df.columns if col not in features]
+            ignore_features = [feature for feature in ignore_features if feature in df.columns]
+            
+            # Print ignore_features list to confirm the selected features
+            st.write("Ignore Features:", ignore_features)
+            
+            # Proceed if features are selected
+            if features:
+                if st.button("Run Model"):
+                    # Determine analysis type (classification or regression)
+                    if df[target].dtype == "object" or len(df[target].unique()) < 10:st.session_state.analysis_type = "Classification"
+                    else:
+                        st.session_state.analysis_type = "Regression"
+                    
+                    # Model training and evaluation
+                    if st.session_state.analysis_type == "Regression":
+                        # Validate ignore_features to ensure it does not include the target variable
+                        if target in ignore_features:
+                            ignore_features.remove(target)
+                        regression_setup(df, target=target, ignore_features=ignore_features)
+                        setup_df = regression_pull()
+                        st.info("ML Experiment Settings")
+                        st.dataframe(setup_df)
+                        best_model = regression_compare_models()
+                        compare_df = regression_pull()
+                        st.info("Model Comparison")
+                        st.dataframe(compare_df)
+                        regression_save_model(best_model, "best_model.pkl")
+                        st.success("Model trained and saved successfully!")
+                    
+                    elif st.session_state.analysis_type == "Classification":
+                        # Validate ignore_features to ensure it does not include the target variable
+                        if target in ignore_features:
+                            ignore_features.remove(target)
+                        classification_setup(df, target=target, ignore_features=ignore_features)
+                        setup_df = classification_pull()
+                        st.info("ML Experiment Settings")
+                        st.dataframe(setup_df)
+                        best_model = classification_compare_models()
+                        compare_df = classification_pull()
+                        st.info("Model Comparison")
+                        st.dataframe(compare_df)
+                        tuned_model = classification_tune_model(best_model)
+                        classification_save_model(tuned_model, "best_model.pkl")
+                        st.success("Model trained and saved successfully!")
+            else:
+                st.warning("Please select features for modeling.")
+
+# Download section
+elif choice == "Download":
+    st.title("Download the Best Model")
+    model_file = "best_model.pkl"
+    if os.path.exists(model_file):
+        st.download_button("Download the Model", open(model_file, "rb"), file_name="best_model.pkl")
+        st.success("Model downloaded successfully!")
+    else:
+        st.warning("No model available to download.")
+
+# Inference section
+elif choice == "Inference":
+    st.title("Upload Data for Predictions")
+    inference_file = st.file_uploader("Upload a CSV file for predictions", type=["csv"])
+    if inference_file and st.session_state.analysis_type:
+        df_inference = pd.read_csv(inference_file)
+        
+        # Load the best model
+        model_file = "best_model.pkl"
+        if st.session_state.analysis_type == "Regression":
+            regression_model = regression_load_model(model_file)
+            predictions = regression_predict_model(regression_model, data=df_inference)
+        
+        elif st.session_state.analysis_type == "Classification":
+            classification_model = classification_load_model(model_file)
+            predictions = classification_predict_model(classification_model, data=df_inference)
+        
+        # Display predictions and allow download
+        st.subheader("Predictions:")
+        st.write(predictions)
+        predictions.to_csv("predictions.csv", index=False)
+        st.download_button("Download Predictions", open("predictions.csv", "rb"), file_name="predictions.csv")
+        st.success("Predictions saved and ready for download!")
+    else:
+        st.warning("Please upload a CSV file and ensure a model type is specified for predictions.")
