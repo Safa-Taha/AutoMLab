@@ -1,8 +1,8 @@
 # AutoMLab: Automated Machine Learning Pipeline
 
-![alt text](WebPage.png)
+![alt text](Webpage.png)
 
-**AutoMLab** is an application that allows you to build an automated machine learning pipeline using Streamlit and scikit-learn. The app provides an intuitive interface for uploading data, performing exploratory data analysis (EDA), preprocessing data, and building and evaluating machine learning models. The application provides informative warnings in case of errors during plotting, data processing, or model evaluation.
+**AutoMLab** is an application that allows users to build an automated machine learning pipeline using Streamlit and scikit-learn. The app provides an intuitive interface for uploading data, performing exploratory data analysis (EDA), preprocessing data, and building and evaluating machine learning models. The application provides informative warnings in case of errors during plotting, data processing, or model evaluation.
 
 ## Features
 
