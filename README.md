@@ -1,30 +1,51 @@
-![alt text](Webpage.png)
-## Overview
-This application is an automated machine learning app built with Streamlit, PyCaret, and Pandas Profiling. This app allows you to upload your data, perform exploratory data analysis (EDA), generate machine learning models, and make predictions using the trained models. The application is designed to be user-friendly and offers a wide range of options for data preprocessing, visualization, and modeling.
+# AutoMLab: Automated Machine Learning Pipeline
+
+![alt text](WebPage.png)
+
+**AutoMLab** is an application that allows you to build an automated machine learning pipeline using Streamlit and scikit-learn. The app provides an intuitive interface for uploading data, performing exploratory data analysis (EDA), preprocessing data, and building and evaluating machine learning models. The application provides informative warnings in case of errors during plotting, data processing, or model evaluation.
 
 ## Features
-![alt text](DataProcessing.jpg)
-![alt text](Inference.png)
-- Data Loading
-- Data Cleaning
-- Data Encoding
-- Model Generation
-- Model Download
-- Model Inference
 
-## Installation and Usage
+- **Upload**: Upload your data as a CSV file for modeling.
+- **Profiling**: Perform automated exploratory data analysis, including visualizing data.
+- **Data Processing**: Clean and preprocess your data, including handling missing values and encoding categorical data.
+- **MLab**: Choose a machine learning method (regression or classification) and build models using various algorithms. Evaluate and visualize the models' performance with different plots and metrics.
 
-To run the app locally, you will need Python 3.x and the following dependencies:
+## Getting Started
 
-- **Streamlit**: A framework for building machine learning and data science web apps.
-- **Pandas**: A library for data manipulation and analysis.
-- **NumPy**: A library for numerical computing.
-- **Matplotlib**: A library for creating static, animated, and interactive visualizations in Python.
-- **Seaborn**: A library for statistical data visualization.
-- **Scikit-learn**: A library for machine learning in Python.
-- **PyCaret**: A low-code machine learning library in Python.
+To get started with **AutoMLab**, follow the instructions below:
 
-You can install the required packages using `pip`:
+1. **Clone the repository**:
 
-```bash
-pip install streamlit pycaret pandas numpy matplotlib seaborn scikit-learn
+    ```bash
+    git clone <repository_url>
+    ```
+
+2. **Navigate to the project directory**:
+
+    ```bash
+    cd <project_directory>
+    ```
+
+3. **Install the required packages**:
+
+    Ensure you have Python 3.x installed on your system. Install the required packages using `pip`:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Run the application**:
+
+    ```bash
+    streamlit run app.py
+    ```
+
+    This will start the Streamlit application.
+
+## Usage
+
+- In the **Upload** section, you can upload your data as a CSV file.
+- In the **Profiling** section, explore the data and visualize it.
+- In the **Data Processing** section, you can clean and preprocess your data.
+- In the **MLab** section, choose the target variable and method (regression or classification), and build your model. Choose the plots and metrics you want to display.
