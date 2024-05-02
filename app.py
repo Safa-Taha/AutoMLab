@@ -216,6 +216,7 @@ def display_chart(df, target, method):
 
         # Confusion matrix flag to avoid duplicate plotting
         confusion_matrix_plotted = False
+        
 # Provide plot options for the user to choose
         plot_options = ['ROC Curve', 'Confusion Matrix']
         if method in ['LogisticRegression', 'SVC']:
