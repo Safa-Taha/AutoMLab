@@ -92,7 +92,6 @@ def display_chart(df, target, method):
     # Instantiate the selected model
     model = MODELS[method]()
 
-    # Fit the model to the training data
     model.fit(train, train_target)
 
     # Predict on the test data
@@ -125,7 +124,6 @@ def display_chart(df, target, method):
         if method == 'Ridge':
             plot_options.append('Alpha vs Coefficient Plot')
 
-        # Ask the user to select a plot to display
         selected_plot = st.selectbox('Choose a Plot to Display:', plot_options)
 
         # Display the selected plot
@@ -181,8 +179,7 @@ def display_chart(df, target, method):
                     ridge_model = Ridge(alpha=alpha)
                     ridge_model.fit(train, train_target)
                     coefs.append(ridge_model.coef_)
-                
-                # Ensure coefs and feature_names lengths match
+
                 if len(coefs) > 0 and len(coefs[0]) != len(feature_names):
                     st.markdown("**Warning:** Length mismatch between features and coefficients.")
                     return
@@ -226,7 +223,6 @@ def display_chart(df, target, method):
             plot_options.append('Partial Dependence Plot')
             plot_options.append('Learning Curve Plot')
 
-        # Ask the user to select a plot to display
         selected_plot = st.selectbox('Choose a Plot to Display:', plot_options)
 
         # Display the selected plot
@@ -313,7 +309,7 @@ def display_chart(df, target, method):
             try:
                 coefficients = model.coef_
                 
-                # Handle potential scalar values (e.g., numpy.float64)
+                # Handle potential scalar values
                 if isinstance(coefficients, np.float64):
                     st.markdown("**Warning:** Coefficients not available for the selected model.")
                     return
@@ -351,7 +347,7 @@ def display_chart(df, target, method):
                 st.markdown(f"**Warning:** Error in Feature Importance Plot: {str(e)}")
 
         elif selected_plot == 'Partial Dependence Plot' and method in ['RandomForestClassifier', 'GradientBoostingClassifier']:
-            # Ask the user to input the feature name for Partial Dependence Plot
+
             feature = st.text_input("Enter the feature name for Partial Dependence Plot:")
             # Check if the input feature exists in the DataFrame
             if feature in train.columns:
@@ -372,7 +368,7 @@ def display_chart(df, target, method):
             try:
                 train_sizes, train_scores, test_scores = learning_curve(model, train, train_target, cv=5)
                 
-                # Plot learning curve plot
+                # Plot learning curve
                 fig, ax = plt.subplots()
                 ax.plot(train_sizes, np.mean(train_scores, axis=1), label='Training Loss', color='blue')
                 ax.plot(train_sizes, np.mean(test_scores, axis=1), label='Validation Loss', color='red')
@@ -490,5 +486,5 @@ elif choice == "MLab":
                 
             method = st.selectbox('Choose a Method', method_options)
 
-            # Display charts based on selected method and target
+
             display_chart(df, target, method)
