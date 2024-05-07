@@ -15,9 +15,9 @@
 
 To get started with **AutoMLab**, follow the instructions below:
 
-1. **Clone the repository**:
+1. **Clone the repository**
 
-2. **Navigate to the project directory**:
+2. **Navigate to the project directory**
 
 3. **Install the required packages**:
 
